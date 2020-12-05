@@ -9,7 +9,6 @@ use phf::{phf_map, phf_set};
 use regex::Regex;
 
 
-
 static REQUIRED_KEYS: phf::Set<&'static str> = phf_set! {
     "byr", "iyr", "eyr", "hgt", "hcl", "ecl", "pid"
 };
