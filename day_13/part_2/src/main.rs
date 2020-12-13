@@ -52,10 +52,9 @@ fn parse_input(mut lines: Box<dyn Iterator<Item = String>>) -> Vec<(i64, i64)> {
         })
         .map( |(idx, capture)| {
             let period = capture.as_str().parse::<i64>().unwrap();
-            (
-                period,
-                period - idx as i64   
-            )
+            let mut idx = period - idx as i64;
+            while idx < 0{idx += period}
+            (period, idx)
         }).collect()
 }
 
