@@ -13,10 +13,42 @@ fn main() {
     let aoc_reader = AocBufReader::from_file(open_file(filename));
     let (ranges_map, your_ticket, nearby_tickets) = parse_input(Box::new(aoc_reader));
 
+
+    let all_tickets: HashSet<u64> = (0..your_ticket.vals.len()).map(|x| x as u64).collect();
     let mut class_to_duds: HashMap<String, HashSet<u64>> = HashMap::new();
+    for class in ranges_map.keys() {
+        class_to_duds.insert(class.to_string(), HashSet::new());
+    }
 
+    for ticket in nearby_tickets.iter().filter(
+        |ticket| {
+            (*ticket).is_valid(&ranges_map)
+        }
+    ) {
+        for (idx, val) in ticket.vals.iter().enumerate() {
+            for (class, ranges) in &ranges_map {
+                if !ranges.any_range_contains(&val) {
+                    println!("val {} can't fit in class: {}", val, class);
+                    class_to_duds.get_mut(&class.to_string()).unwrap().insert(idx as u64);
+                }
+            }
+        }
+    }
 
+    let mut class_to_candidates: HashMap<String, HashSet<u64>> = HashMap::new();
+    for (class, duds) in class_to_duds {
+        class_to_candidates.insert(
+            class.to_string(),
+            all_tickets.difference(&duds).map(|x| *x).collect()
+        );
+    }
 
+    for (class, duds) in class_to_candidates {
+        println!("{}", class);
+        for dud in duds.iter() {
+            println!("{}", dud);
+        }
+    }
 }
 
 
@@ -125,9 +157,7 @@ struct Ticket {
 impl Ticket {
     fn is_valid(&self, range_map: &HashMap<String, Ranges>) -> bool {
         for val in self.vals.iter() {
-            if !any_class_range_contains(&val, range_map) {
-                return false
-            }
+            if !any_class_range_contains(&val, range_map) { return false }
         }
         true
     }
