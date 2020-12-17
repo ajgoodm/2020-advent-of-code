@@ -12,43 +12,25 @@ fn main() {
     let filename = &args[1];
     let aoc_reader = AocBufReader::from_file(open_file(filename));
     let (ranges_map, your_ticket, nearby_tickets) = parse_input(Box::new(aoc_reader));
-
-
-    let all_tickets: HashSet<u64> = (0..your_ticket.vals.len()).map(|x| x as u64).collect();
-    let mut class_to_duds: HashMap<String, HashSet<u64>> = HashMap::new();
-    for class in ranges_map.keys() {
-        class_to_duds.insert(class.to_string(), HashSet::new());
+    let mut solver: Solver = Solver::from_range_map(ranges_map);
+    for ticket in nearby_tickets {
+        solver.add_ticket(ticket);
     }
+    solver.solve();
 
-    for ticket in nearby_tickets.iter().filter(
-        |ticket| {
-            (*ticket).is_valid(&ranges_map)
+    
+    let product: i64 = solver.class_idx_map.iter().filter(
+        |(class, _idx)| {class.len() >= 9 && &class[..9] == "departure"}
+    ).map(
+        |(class, _idx)| {
+            your_ticket.vals[
+                Solver::get_one_or_none_idx(
+                    solver.get_row(*solver.class_idx_map.get(class).unwrap())
+                ).unwrap()
+            ]
         }
-    ) {
-        for (idx, val) in ticket.vals.iter().enumerate() {
-            for (class, ranges) in &ranges_map {
-                if !ranges.any_range_contains(&val) {
-                    println!("val {} can't fit in class: {}", val, class);
-                    class_to_duds.get_mut(&class.to_string()).unwrap().insert(idx as u64);
-                }
-            }
-        }
-    }
-
-    let mut class_to_candidates: HashMap<String, HashSet<u64>> = HashMap::new();
-    for (class, duds) in class_to_duds {
-        class_to_candidates.insert(
-            class.to_string(),
-            all_tickets.difference(&duds).map(|x| *x).collect()
-        );
-    }
-
-    for (class, duds) in class_to_candidates {
-        println!("{}", class);
-        for dud in duds.iter() {
-            println!("{}", dud);
-        }
-    }
+    ).product();
+    println!("{}", product);
 }
 
 
@@ -122,6 +104,105 @@ fn any_class_range_contains(val: &i64, range_map: &HashMap<String, Ranges>) -> b
     }
     return false
 }
+
+
+struct Solver {
+    range_map: HashMap<String, Ranges>,
+    class_idx_map: HashMap<String, usize>,
+    grid: Vec<Vec<bool>>
+}
+
+
+impl Solver {
+    fn from_range_map(range_map: HashMap<String, Ranges>) -> Solver {
+        let mut class_idx_map: HashMap<String, usize> = HashMap::new();
+        for (idx, class) in range_map.keys().enumerate() {
+            class_idx_map.insert(class.to_string(), idx as usize);
+        }
+        let grid = vec![
+            vec![true; class_idx_map.keys().len()]; class_idx_map.keys().len()
+        ];
+        Solver {
+            range_map: range_map,
+            class_idx_map: class_idx_map,
+            // the row corresponds to the key
+            // the column corresponds to the slot
+            grid: grid
+        }
+    }
+
+    fn n_rows_cols(&self) -> usize {
+        self.grid.len()
+    }
+
+    fn is_solved(&self) -> bool {
+        for row in &self.grid {
+            if row.iter().filter(|x| **x).count() != 1 {
+                return false
+            }
+        }
+        true
+    }
+
+    fn get_row(&self, row_idx: usize) -> Vec<bool> {
+        self.grid[row_idx].iter().map(|x| *x).collect()
+    }
+    
+    fn get_col(&self, col_idx: usize) -> Vec<bool> {
+        self.grid.iter().map(|row| row[col_idx]).collect()
+    }
+
+    fn add_ticket(&mut self, ticket: Ticket) {
+        if !ticket.is_valid(&self.range_map) { return }
+        for (slot, val) in ticket.vals.iter().enumerate() {
+            for (class, ranges) in &self.range_map {
+                if !ranges.any_range_contains(&val) {
+                    self.grid[*self.class_idx_map.get(class).unwrap()][slot] = false;
+                }
+            }
+        }
+    }
+
+    fn get_one_or_none_idx(vec: Vec<bool>) -> Option<usize> {
+        let results: Vec<(usize, bool)> = vec.iter().enumerate()
+            .filter(|(idx, x)| **x)
+            .map(|(idx, x)| (idx, *x))
+            .collect();
+        match results.len() {
+            1 => {
+                let (idx, _val) = results[0];
+                Some(idx)
+            } 
+            _ => None
+        }
+    }
+
+    fn solve(&mut self) {
+        while !self.is_solved() {
+            for candidate_idx in 0..self.n_rows_cols() {
+                match Solver::get_one_or_none_idx(self.get_row(candidate_idx)) {
+                    Some(idx) => {
+                        for ii in (0..self.n_rows_cols()).filter(|ii| *ii != candidate_idx) {
+                            self.grid[ii][idx] = false
+                        }
+                    },
+                    None => ()
+                }
+            }
+            for candidate_idx in 0..self.n_rows_cols() {
+                match Solver::get_one_or_none_idx(self.get_col(candidate_idx)) {
+                    Some(idx) => {
+                        for ii in (0..self.n_rows_cols()).filter(|ii| *ii != candidate_idx) {
+                            self.grid[idx][ii] = false
+                        }
+                    },
+                    None => ()
+                }
+            }
+        }
+    }
+}
+
 
 
 struct Ranges {
@@ -210,5 +291,12 @@ mod tests {
     #[test]
     fn test_parse_ticket() {
         assert_eq!(parse_ticket("7,1,14"), Ticket { vals: vec![7, 1, 14] });
+    }
+
+    #[test]
+    fn test_get_one_or_none_idx() {
+        assert_eq!(Solver::get_one_or_none_idx(vec![true, false, false]), Some(0));
+        assert_eq!(Solver::get_one_or_none_idx(vec![true, true, false]), None);
+        assert_eq!(Solver::get_one_or_none_idx(vec![false, false, false]), None);
     }
 }
