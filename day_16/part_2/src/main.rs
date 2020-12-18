@@ -11,6 +11,7 @@ fn main() {
     let args: Vec<String> = env::args().collect();
     let filename = &args[1];
     let aoc_reader = AocBufReader::from_file(open_file(filename));
+
     let (ranges_map, your_ticket, nearby_tickets) = parse_input(Box::new(aoc_reader));
     let mut solver: Solver = Solver::from_range_map(ranges_map);
     for ticket in nearby_tickets {
