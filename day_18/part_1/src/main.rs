@@ -34,11 +34,6 @@ fn evaluate_flat_expression(exp: &str) -> i64 {
         ).unwrap();
     }
     lazy_static! {
-        static ref FINAL: Regex = Regex::new(
-            r"^([0-9]) ([\+*]{1}) ([0-9])$"
-        ).unwrap();
-    }
-    lazy_static! {
         static ref SINGLE_NUMBER: Regex = Regex::new(
             r"^([0-9]+)$"
         ).unwrap();
@@ -46,22 +41,6 @@ fn evaluate_flat_expression(exp: &str) -> i64 {
     
     match SINGLE_NUMBER.captures(exp) {
         Some(captures) => return captures.get(1).unwrap().as_str().parse::<i64>().unwrap(),
-        None => ()
-    }
-
-    match FINAL.captures(exp) {
-        Some(captures) => {
-            let (arg1, operator, arg2): (i64, &str, i64) = (
-                captures.get(1).unwrap().as_str().parse::<i64>().unwrap(),
-                captures.get(2).unwrap().as_str(),
-                captures.get(3).unwrap().as_str().parse::<i64>().unwrap()
-            );
-            match operator {
-                "*" => return arg1 * arg2,
-                "+" => return arg1 + arg2,
-                _ => panic!("something went wrong parsing final expr.")
-            }
-        }
         None => ()
     }
 
