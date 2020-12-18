@@ -29,11 +29,6 @@ fn evaluate_expression(exp: &str) -> i64 {
 
 fn evaluate_flat_expression(exp: &str) -> i64 {
     lazy_static! {
-        static ref RE: Regex = Regex::new(
-            r"^(.*) ([\+*]{1}) ([0-9]+)$"
-        ).unwrap();
-    }
-    lazy_static! {
         static ref FINAL: Regex = Regex::new(
             r"^([0-9]) ([\+*]{1}) ([0-9])$"
         ).unwrap();
@@ -43,6 +38,17 @@ fn evaluate_flat_expression(exp: &str) -> i64 {
             r"^([0-9]+)$"
         ).unwrap();
     }
+    lazy_static! {
+        static ref ADDN_RE: Regex = Regex::new(
+            r"^(.*\*.* )?([0-9]+) (\+{1}) ([0-9]+)(.*)$"
+        ).unwrap();
+    }
+    lazy_static! {
+        static ref MULT_RE: Regex = Regex::new(
+            r"^([0-9]+) (\*{1}) ([0-9]+)(.*)$"
+        ).unwrap();
+    }
+
     
     match SINGLE_NUMBER.captures(exp) {
         Some(captures) => return captures.get(1).unwrap().as_str().parse::<i64>().unwrap(),
@@ -65,18 +71,48 @@ fn evaluate_flat_expression(exp: &str) -> i64 {
         None => ()
     }
 
-
-    let captures = RE.captures(exp).unwrap();
-    let (remainder, operator, arg2): (&str, &str, i64) = (
-        captures.get(1).unwrap().as_str(),
-        captures.get(2).unwrap().as_str(),
-        captures.get(3).unwrap().as_str().parse::<i64>().unwrap()
-    );
-    match operator {
-        "*" => evaluate_flat_expression(remainder) * arg2,
-        "+" =>  evaluate_flat_expression(remainder) + arg2,
-        _ => panic!("something went wrong parsing intermediate expr!")
+    match ADDN_RE.captures(exp) {
+        Some(captures) => {
+            let (left, arg1, _operator, arg2, right): (Option<regex::Match>, i64, &str, i64, Option<regex::Match>) = (
+                captures.get(1),
+                captures.get(2).unwrap().as_str().parse::<i64>().unwrap(),
+                captures.get(3).unwrap().as_str(),
+                captures.get(4).unwrap().as_str().parse::<i64>().unwrap(),
+                captures.get(5)
+            );
+            let mut result: String = match left {
+                Some(s) => s.as_str().to_string(),
+                None => "".to_string() 
+            };
+            result.push_str(&(arg1 + arg2).to_string());
+            match right {
+                Some(s) => result.push_str(s.as_str()),
+                None => ()
+            }
+            return evaluate_flat_expression(&result)
+        },
+        None => ()
     }
+
+    match MULT_RE.captures(exp) {
+        Some(captures) => {
+            let (arg1, _operator, arg2, right): (i64, &str, i64, Option<regex::Match>) = (
+                captures.get(1).unwrap().as_str().parse::<i64>().unwrap(),
+                captures.get(2).unwrap().as_str(),
+                captures.get(3).unwrap().as_str().parse::<i64>().unwrap(),
+                captures.get(4)
+            );
+            let mut result: String = (arg1 * arg2).to_string();
+            match right {
+                Some(s) => result.push_str(s.as_str()),
+                None => ()
+            }
+            return evaluate_flat_expression(&result)
+        },
+        None => ()
+    }
+
+    panic!("unknown expr: {}", exp);
 }
 
 
@@ -140,21 +176,17 @@ mod tests {
 
     #[test]
     fn test_evaluate_flat_exp() {
-        assert_eq!(evaluate_flat_expression("1 + 2 * 3 + 4 * 5 + 6"), 71);
-    }
-
-    #[test]
-    fn test_replace_parentheses() {
-        assert_eq!(replace_parentheses("1 + (2 * 3) + 4 * 5 + 6".to_string()), "1 + 6 + 4 * 5 + 6".to_string());
-        assert_eq!(replace_parentheses("1 + (2 * 3 + 4) * 5 + 6".to_string()), "1 + 10 * 5 + 6".to_string());
-        assert_eq!(replace_parentheses("1 + (2 * 3) + (4 * 5) + 6".to_string()), "1 + 6 + 20 + 6".to_string());
-        assert_eq!(replace_parentheses("1 + ((2 * 3) + 4) * 5 + 6".to_string()), "1 + 10 * 5 + 6".to_string());
-        assert_eq!(replace_parentheses("1 + (2 * 3) + (4 * (5 + 6))".to_string()), "1 + 6 + 44".to_string());
+        assert_eq!(evaluate_flat_expression("1 + 2 * 3 + 4 * 5 + 6"), 231);
+        assert_eq!(evaluate_flat_expression("8 * 3 + 9 + 3 * 4 * 3"), 1440);
+        assert_eq!(evaluate_flat_expression("11664 + 2 + 4 * 2"), 23340);
     }
 
     #[test]
     fn test_evaluate_exp() {
-        assert_eq!(evaluate_expression("2 * 3 + (4 * 5)"), 26);
-        assert_eq!(evaluate_expression("((2 + 4 * 9) * (6 + 9 * 8 + 6) + 6) + 2 + 4 * 2"), 13632);
+        assert_eq!(evaluate_expression("1 + (2 * 3) + (4 * (5 + 6))"), 51);
+        assert_eq!(evaluate_expression("2 * 3 + (4 * 5)"), 46);
+        assert_eq!(evaluate_expression("5 + (8 * 3 + 9 + 3 * 4 * 3)"), 1445);
+        assert_eq!(evaluate_expression("5 * 9 * (7 * 3 * 3 + 9 * 3 + (8 + 6 * 4))"), 669060);
+        assert_eq!(evaluate_expression("((2 + 4 * 9) * (6 + 9 * 8 + 6) + 6) + 2 + 4 * 2"), 23340);
     }
 }
